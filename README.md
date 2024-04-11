@@ -1,11 +1,15 @@
-# playwright-summary-reporter
+# playwright-simple-json-reporter
 
-[![Build Status on GitHub Actions](https://github.com/aYukiYoshida/playwright-summary-reporter/actions/workflows/build.yml/badge.svg)](BUILD)[![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)[![npm version](https://badge.fury.io/js/playwright-summary-reporter.svg)](https://badge.fury.io/js/playwright-summary-reporter)
+[![Build Status on GitHub Actions](https://github.com/aYukiYoshida/playwright-simple-json-reporter/actions/workflows/build.yml/badge.svg)](BUILD)[![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)[![npm version](https://badge.fury.io/js/playwright-simple-json-reporter.svg)](https://badge.fury.io/js/playwright-summary-reporter)
 
-## NOTICE
+## Installation
 
-This repository is forked from [playwrightsolutions/playwright-summary-json-reporter](https://github.com/playwrightsolutions/playwright-json-summary-reporter).
+```bash
+npm install -D playwright-simple-json-reporter
+```
 
-## Demonstration
+## Usage
 
-You can see the demonstration of this reporter on the repository of [playwright-summary-reporter-demo](https://github.com/aYukiYoshida/playwright-summary-reporter-demo).
+```bash
+npx playwright test --reporter=playwright-simple-json-reporter
+```

@@ -1,11 +1,11 @@
 {
-  "name": "playwright-summary-reporter",
-  "version": "1.1.2",
+  "name": "playwright-simple-json-reporter",
+  "version": "2.0.0",
   "description": "Reporter for the Playwright testing framework",
-  "main": "src/index.js",
-  "types": "src/index.d.ts",
+  "main": "index.js",
+  "types": "index.d.ts",
   "devDependencies": {
-    "@playwright/test": "^1.38.1",
+    "@playwright/test": "^1.43.0",
     "@types/jest": "^29.5.5",
     "@types/node": "^20.7.1",
     "@typescript-eslint/eslint-plugin": "^6.7.3",
@@ -20,6 +20,8 @@
     "prettier": "^3.0.3",
     "rimraf": "^5.0.5",
     "ts-jest": "^29.1.1",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.2.2"
   },
   "scripts": {
@@ -27,11 +29,13 @@
     "prepare:husky": "husky install",
     "prepare:playwright": "playwright install",
     "prebuild": "failsafe clean lint format test",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "pretest": "failsafe clean",
+    "pretest:jest": "failsafe report",
     "test": "failsafe test:playwright test:jest",
     "test:playwright": "playwright test || exit 0",
     "test:jest": "jest",
+    "report": "ts-node scripts/cli.ts report:link",
     "lint": "eslint ./src/**/*.ts --fix",
     "format": "prettier ./src/**/*.ts --write",
     "clean": "rimraf dist && rimraf report && rimraf result",
@@ -48,7 +52,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aYukiYoshida/playwright-summary-reporter.git"
+    "url": "git+https://github.com/aYukiYoshida/playwright-simple-json-reporter.git"
   },
   "keywords": [
     "playwright",
@@ -58,10 +62,11 @@
   "author": "Yuki Yoshida <yuki.yoshida@access-company.com> (https://ayukiyoshida.github.io/tips/)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/aYukiYoshida/playwright-summary-reporter/issues"
+    "url": "https://github.com/aYukiYoshida/playwright-simple-json-reporter/issues"
   },
-  "homepage": "https://github.com/aYukiYoshida/playwright-summary-reporter#readme",
+  "homepage": "https://github.com/aYukiYoshida/playwright-simple-json-reporter#readme",
   "dependencies": {
+    "moment": "^2.30.1",
     "zod": "^3.22.2"
   }
 }
