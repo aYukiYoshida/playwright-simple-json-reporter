@@ -1,6 +1,6 @@
 {
   "name": "playwright-simple-json-reporter",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Reporter for the Playwright testing framework",
   "main": "index.js",
   "types": "index.d.ts",
@@ -40,7 +40,6 @@
     "format": "prettier ./src/**/*.ts --write",
     "clean": "rimraf dist && rimraf report && rimraf result",
     "package": "node scripts/package.js",
-    "postversion": "git push && git push --tags",
     "prerelease": "npm run build && npm run package",
     "release": "npm publish --access=public ./dist"
   },
