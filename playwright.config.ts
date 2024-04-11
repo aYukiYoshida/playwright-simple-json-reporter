@@ -1,10 +1,15 @@
 import { defineConfig, devices } from "@playwright/test";
+import moment from "moment";
 
 /**
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
  */
 // require('dotenv').config();
+
+const jsonReportFileName = `report-${moment().format(
+  "YYYY-MM-DD[T]HH-mm-ss",
+)}.json`;
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -25,12 +30,12 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
-    // native reporters
     [
       "./src/index.ts",
       {
         outputFolder: "report",
-        name: "summary.json",
+        name: jsonReportFileName,
+        projects: ["chromium"],
         testMatch: /.*\.(spec|test|setup)\.[tj]s/,
       },
     ],

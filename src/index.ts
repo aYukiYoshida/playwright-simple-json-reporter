@@ -8,129 +8,109 @@ import {
   FullResult,
 } from "@playwright/test/reporter";
 
-const summarySchema = z.object({
+const resultSchema = z.object({
+  id: z.string(),
+  project: z.string(),
+  location: z.string(),
+  title: z.string(),
+  outcome: z.union([
+    z.literal("skipped"),
+    z.literal("expected"),
+    z.literal("unexpected"),
+    z.literal("flaky"),
+  ]),
+  durationInMs: z.number(),
+});
+
+const reportSchema = z.object({
   startedAt: z.number(),
   durationInMs: z.number(),
-  passed: z.array(z.string()),
-  skipped: z.array(z.string()),
-  failed: z.array(z.string()),
-  warned: z.array(z.string()),
-  interrupted: z.array(z.string()),
-  timedOut: z.array(z.string()),
+  results: z.array(resultSchema),
   status: z.union([
     z.literal("passed"),
     z.literal("failed"),
     z.literal("timedout"),
     z.literal("interrupted"),
     z.literal("unknown"),
-    z.literal("warned"),
-    z.literal("skipped"),
   ]),
 });
 
-type Summary = z.infer<typeof summarySchema>;
-
-type SummaryReporterOptions = {
+export type Report = z.infer<typeof reportSchema>;
+export type Result = z.infer<typeof resultSchema>;
+export type ReporterOptions = {
   name?: string;
   outputFolder?: string;
+  projects?: string[];
   testMatch?: RegExp;
 };
 
-class SummaryReporter implements Reporter, Summary {
-  startedAt = 0;
-  durationInMs = -1;
-  passed: string[] = [];
-  skipped: string[] = [];
-  failed: string[] = [];
-  warned: string[] = [];
-  interrupted: string[] = [];
-  timedOut: string[] = [];
-  status: Summary["status"] = "unknown";
-  private name: string;
+class SimpleJsonReporter implements Reporter {
+  startedAt: number = 0;
+  durationInMs: number = 0;
+  status: Report["status"] = "unknown";
+  results: Result[] = [];
+  private filename: string;
   private outputFolder: string;
   private testMatch: RegExp;
+  private projects: string[];
 
-  constructor(options: SummaryReporterOptions = {}) {
-    this.name = options.name ? options.name : "summary.json";
-    this.outputFolder = options.outputFolder ? options.outputFolder : "report";
-    this.testMatch = options.testMatch
-      ? options.testMatch
-      : /.*\.(spec|test|setup)\.(j|t|mj)s/;
+  constructor(options: ReporterOptions = {}) {
+    this.filename = options.name ?? "report.json";
+    this.outputFolder = options.outputFolder ?? "report";
+    this.projects = options.projects ?? [];
+    this.testMatch = options.testMatch ?? /.*\.(spec|test|setup)\.(j|t|mj)s/;
   }
 
-  onBegin() {
-    this.startedAt = Date.now();
+  onTestEnd(testCase: TestCase, testResult: TestResult): void {
+    const project =
+      testCase.titlePath().find((s) => this.projects.includes(s)) ?? "";
+    const filename =
+      testCase.titlePath().find((s) => this.testMatch.test(s)) ?? "";
+    const title = testCase
+      .titlePath()
+      .filter((s) => s !== "" && s !== project && s !== filename);
+    const result: Result = {
+      id: testCase.id,
+      project: project,
+      location: `${filename}:${testCase.location.line}:${testCase.location.column}`,
+      title: title.join(" > "),
+      outcome: testCase.outcome(),
+      durationInMs: testResult.duration,
+    };
+    this.results.push(result);
   }
 
-  onTestEnd(test: TestCase, result: TestResult) {
-    const title = [];
-    const fileName = [];
-    let clean = true;
-    for (const s of test.titlePath()) {
-      if (s === "" && clean) continue;
-      clean = false;
-      title.push(s);
-      if (this.testMatch.test(s)) {
-        fileName.push(s);
-      }
-    }
+  onEnd(fullResult: FullResult) {
+    this.startedAt = fullResult.startTime.getTime();
+    this.durationInMs = fullResult.duration;
+    this.status = fullResult.status;
 
-    // This will publish the file name + line number test begins on
-    const z = `${fileName[0]}:${test.location.line}:${test.location.column}`;
-
-    // Using the t variable in the push will push a full test test name + test description
-    const t = title.join(" > ");
-
-    const status =
-      !["passed", "skipped"].includes(result.status) && t.includes("@warn")
-        ? "warned"
-        : result.status;
-    if (status === "passed") this.passed.push(z);
-    else if (status === "failed") this.failed.push(z);
-    else if (status === "timedOut") this.timedOut.push(z);
-    else if (status === "interrupted") this.interrupted.push(z);
-    else if (status === "warned") this.warned.push(z);
-    else if (status === "skipped") this.skipped.push(z);
-    else throw new Error(`Unexpected status: ${status}`);
-  }
-
-  onEnd(result: FullResult) {
-    this.durationInMs = Date.now() - this.startedAt;
-    this.status = result.status;
-
-    // removing duplicate tests from passed array
-    this.passed = this.passed.filter((element, index) => {
-      return this.passed.indexOf(element) === index;
+    // removing duplicate tests from results array
+    this.results = this.results.filter((result, index) => {
+      return this.results.indexOf(result) === index;
     });
 
-    // removing duplicate and flakey (passed on a retry) tests from the failed array
-    this.failed = this.failed.filter((element, index) => {
-      if (!this.passed.includes(element))
-        return this.failed.indexOf(element) === index;
-    });
-
-    const summary: Summary = {
+    const report: Report = {
       startedAt: this.startedAt,
       durationInMs: this.durationInMs,
-      passed: this.passed,
-      skipped: this.skipped,
-      failed: this.failed,
-      warned: this.warned,
-      interrupted: this.interrupted,
-      timedOut: this.timedOut,
+      results: this.results,
       status: this.status,
     };
     if (!fs.existsSync(this.outputFolder))
       fs.mkdirSync(this.outputFolder, { recursive: true });
     fs.writeFileSync(
-      path.join(this.outputFolder, this.name),
-      JSON.stringify(summary, null, 2),
+      path.join(this.outputFolder, this.filename),
+      JSON.stringify(report, null, 2),
     );
   }
 
-  public static isSummary(obj: unknown): obj is Summary {
-    return summarySchema.safeParse(obj).success;
+  public static isValidResult(obj: unknown): obj is Result {
+    return resultSchema.safeParse(obj).success;
+  }
+
+  public static isValidReport(obj: unknown): obj is Report {
+    return reportSchema.safeParse(obj).success;
   }
 }
 
-export default SummaryReporter;
+export default SimpleJsonReporter;
