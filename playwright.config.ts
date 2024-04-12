@@ -1,5 +1,4 @@
 import { defineConfig, devices } from "@playwright/test";
-import moment from "moment";
 
 /**
  * Read environment variables from file.
@@ -7,9 +6,7 @@ import moment from "moment";
  */
 // require('dotenv').config();
 
-const jsonReportFileName = `report-${moment().format(
-  "YYYY-MM-DD[T]HH-mm-ss",
-)}.json`;
+const jsonReportFileName = "report.json";
 
 /**
  * See https://playwright.dev/docs/test-configuration.

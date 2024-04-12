@@ -3,7 +3,7 @@ import sjr from "simple-json-reporter";
 import { Report, Result } from "simple-json-reporter";
 
 test("レポートが正しく出力されること", () => {
-  const file = "report/latest.json";
+  const file = "report/report.json";
   expect(fs.existsSync(file)).toBeTruthy();
   const report = JSON.parse(fs.readFileSync(file, "utf-8"));
   for (const result of (report as Report).results) {

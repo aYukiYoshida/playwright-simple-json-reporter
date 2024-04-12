@@ -1,12 +1,7 @@
 # Playwright
 /result/
-/result.bak/
 /report/
-/test-results/
-/test-report/
-/playwright-report/
-/playwright-result/
-/playwright/.cache/
+/report-*/
 /tmp/
 
 # Logs

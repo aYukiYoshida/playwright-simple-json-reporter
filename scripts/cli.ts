@@ -1,11 +1,10 @@
 import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
-import moment from "moment";
 import { Command } from "commander";
 import { PlaywrightTestConfig } from "@playwright/test";
 import testConfig from "playwright-config";
-import { ReporterOptions, Report } from "simple-json-reporter";
+import { ReporterOptions, Report, Result } from "simple-json-reporter";
 
 const hasReporterConfig = (config: PlaywrightTestConfig) => {
   return "reporter" in config;
@@ -23,12 +22,13 @@ const getSimpleJsonReporterOptions = (
   config: PlaywrightTestConfig,
 ): ReporterOptions => {
   const reporterConfig = getReporterConfig(config);
-  if (reporterConfig === "simple-json-reporter") {
+  if (reporterConfig === "playwright-simple-json-reporter") {
     return {};
   }
   if (typeof reporterConfig === "object") {
     const config = reporterConfig.find(
-      (c) => c[0] === "simple-json-reporter" || c[0] === "./src/index.ts",
+      (c) =>
+        c[0] === "playwright-simple-json-reporter" || c[0] === "./src/index.ts",
     );
     if (!config) {
       throw new Error(
@@ -45,43 +45,53 @@ const getSimpleJsonReporterOptions = (
   throw new Error("The reporter is not defined in the config of Playwright");
 };
 
-const linkLatestReport = () => {
+const getFormattedDate = (value: string | number | Date, format: string) => {
+  const date = new Date(value);
+  const symbol = {
+    M: date.getMonth() + 1,
+    d: date.getDate(),
+    h: date.getHours(),
+    m: date.getMinutes(),
+    s: date.getSeconds(),
+  };
+
+  const formatted = format.replace(/(M+|d+|h+|m+|s+)/g, (v) =>
+    (
+      (v.length > 1 ? "0" : "") + symbol[v.slice(-1) as keyof typeof symbol]
+    ).slice(-2),
+  );
+
+  return formatted.replace(/(y+)/g, (v) =>
+    date.getFullYear().toString().slice(-v.length),
+  );
+};
+
+const backupLatestReport = () => {
   const reporterOptions = getSimpleJsonReporterOptions(testConfig);
   const reportFolder = reporterOptions.outputFolder ?? "report";
-  const latestReport = path.join(reportFolder, "latest.json");
-  const reportRegex = /^report-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}).json$/;
-  const reports: string[] = fs.readdirSync(reportFolder).filter((file) => {
-    return file.match(reportRegex);
-  });
-  if (reports.length === 0) {
-    console.error(`No report found in ${reportFolder}`);
-    process.exit(1);
-  } else {
-    const latest = reports
-      .map((report) => {
-        const match = report.match(reportRegex);
-        if (!match) {
-          throw new Error(`The report name is invalid: ${report}`);
-        }
-        return moment(match[1], "YYYY-MM-DD[T]HH-mm-ss");
-      })
-      .reduce((latest, current) => {
-        return current.isAfter(latest) ? current : latest;
-      }, moment("2000-01-01"));
-
-    if (fs.existsSync(latestReport)) {
-      fs.unlinkSync(latestReport);
+  const reportFilePath = path.join(
+    reportFolder,
+    reporterOptions.name ?? "report.json",
+  );
+  if (fs.existsSync(reportFilePath)) {
+    const report: Report = JSON.parse(
+      fs.readFileSync(reportFilePath).toString(),
+    );
+    const startedAt = getFormattedDate(report.startedAt, "yyyy-MM-ddThh-mm-ss");
+    const backupReportFolder = path.join(
+      path.dirname(reportFolder),
+      `report-${startedAt}`,
+    );
+    if (!fs.existsSync(backupReportFolder)) {
+      fs.mkdirSync(backupReportFolder);
+      fs.readdirSync(reportFolder).forEach((file) => {
+        fs.cpSync(
+          path.join(reportFolder, file),
+          path.join(backupReportFolder, file),
+          { recursive: true },
+        );
+      });
     }
-
-    fs.symlinkSync(
-      path.join(".", `report-${latest.format("YYYY-MM-DD[T]HH-mm-ss")}.json`),
-      latestReport,
-    );
-    console.info(
-      `The report of ${latest.format(
-        "YYYY-MM-DD[T]HH-mm-ss",
-      )} is linked to latest.`,
-    );
   }
 };
 
@@ -89,15 +99,15 @@ const runLatestFailedTests = (options: string[]) => {
   const reporterOptions = getSimpleJsonReporterOptions(testConfig);
   const reportFilePath = path.join(
     reporterOptions.outputFolder ?? "report",
-    "latest.json",
+    reporterOptions.name ?? "report.json",
   );
   if (!fs.existsSync(reportFilePath))
     throw new Error(`${reportFilePath} does not exist`);
 
   const report: Report = JSON.parse(fs.readFileSync(reportFilePath).toString());
   const targets: string[] = report.results
-    .filter((result) => result.outcome === "unexpected")
-    .map((result) => result.location);
+    .filter((result: Result) => result.outcome === "unexpected")
+    .map((result: Result) => result.location);
   if (targets.length) {
     execSync(`npx playwright test ${options.join(" ")} ${targets.join(" ")}`, {
       stdio: "inherit",
@@ -120,10 +130,10 @@ program
     runLatestFailedTests(options);
   });
 program
-  .command("report:link")
+  .command("report:backup")
   .description("Link the report of latest-run tests to the latest")
   .action(() => {
-    linkLatestReport();
+    backupLatestReport();
   });
 
 program.parse(process.argv);
