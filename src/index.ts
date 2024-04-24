@@ -8,24 +8,25 @@ import {
   FullResult,
 } from "@playwright/test/reporter";
 
+const outcomeSchema = z.union([
+  z.literal("skipped"),
+  z.literal("expected"),
+  z.literal("unexpected"),
+  z.literal("flaky"),
+]);
+
 const resultSchema = z.object({
   id: z.string(),
   project: z.string(),
   location: z.string(),
   title: z.string(),
-  outcome: z.union([
-    z.literal("skipped"),
-    z.literal("expected"),
-    z.literal("unexpected"),
-    z.literal("flaky"),
-  ]),
+  outcome: outcomeSchema,
   durationInMs: z.number(),
 });
 
 const reportSchema = z.object({
   startedAt: z.number(),
   durationInMs: z.number(),
-  results: z.array(resultSchema),
   status: z.union([
     z.literal("passed"),
     z.literal("failed"),
@@ -33,8 +34,10 @@ const reportSchema = z.object({
     z.literal("interrupted"),
     z.literal("unknown"),
   ]),
+  results: z.array(resultSchema),
 });
 
+export type Outcome = z.infer<typeof outcomeSchema>;
 export type Report = z.infer<typeof reportSchema>;
 export type Result = z.infer<typeof resultSchema>;
 export type ReporterOptions = {
@@ -44,10 +47,39 @@ export type ReporterOptions = {
   testMatch?: RegExp;
 };
 
+/**
+ * Determine result from duplicate results of the same test case
+ */
+const determineResult = (results: Result[]): Result => {
+  if (results.length === 1) {
+    return results[0];
+  }
+  const outcome: Outcome[] = Array.from(
+    new Set(results.map((result) => result.outcome)),
+  );
+  if (outcome.includes("expected")) {
+    return results.filter((result) => result.outcome === "expected")[0];
+  } else if (outcome.includes("flaky")) {
+    return results.filter((result) => result.outcome === "flaky")[0];
+  } else {
+    return results.filter((result) => result.outcome === "unexpected")[0];
+  }
+};
+
+/**
+ * Remove duplicate results of the same test case
+ */
+const removeDuplicateResults = (results: Result[]): Result[] => {
+  const testIds: string[] = Array.from(
+    new Set(results.map((result) => result.id)),
+  );
+  return testIds.map((id) => {
+    const intendResults: Result[] = results.filter((r) => r.id === id);
+    return determineResult(intendResults);
+  });
+};
+
 class SimpleJsonReporter implements Reporter {
-  startedAt: number = 0;
-  durationInMs: number = 0;
-  status: Report["status"] = "unknown";
   results: Result[] = [];
   private filename: string;
   private outputFolder: string;
@@ -81,20 +113,14 @@ class SimpleJsonReporter implements Reporter {
   }
 
   onEnd(fullResult: FullResult) {
-    this.startedAt = fullResult.startTime.getTime();
-    this.durationInMs = fullResult.duration;
-    this.status = fullResult.status;
-
     // removing duplicate tests from results array
-    this.results = this.results.filter((result, index) => {
-      return this.results.indexOf(result) === index;
-    });
+    const results = removeDuplicateResults(this.results);
 
     const report: Report = {
-      startedAt: this.startedAt,
-      durationInMs: this.durationInMs,
-      results: this.results,
-      status: this.status,
+      startedAt: fullResult.startTime.getTime(),
+      durationInMs: fullResult.duration,
+      status: fullResult.status,
+      results: results,
     };
     if (!fs.existsSync(this.outputFolder))
       fs.mkdirSync(this.outputFolder, { recursive: true });
