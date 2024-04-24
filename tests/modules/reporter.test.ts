@@ -23,6 +23,7 @@ test("レポートが正しく出力されること", () => {
       "playwright.test.ts:10:6",
     ]),
   );
+  expect(skipped.length).toEqual(6);
   const expected = (report as Report).results
     .filter((r: Result) => r.outcome === "expected")
     .map((r: Result) => r.location);
@@ -36,6 +37,7 @@ test("レポートが正しく出力されること", () => {
       "playwright.test.ts:3:5",
     ]),
   );
+  expect(expected.length).toEqual(6);
   const unexpected = (report as Report).results
     .filter((r: Result) => r.outcome === "unexpected")
     .map((r: Result) => r.location);
@@ -55,6 +57,7 @@ test("レポートが正しく出力されること", () => {
       "playwright.test.ts:24:5",
     ]),
   );
+  expect(unexpected.length).toEqual(12);
   const flaky = (report as Report).results
     .filter((r: Result) => r.outcome === "flaky")
     .map((r: Result) => r.location);
