@@ -1,10 +1,9 @@
 import fs from "fs";
 import path from "path";
-import { execSync } from "child_process";
 import { Command } from "commander";
 import { PlaywrightTestConfig } from "@playwright/test";
 import testConfig from "playwright-config";
-import { ReporterOptions, Report, Result } from "simple-json-reporter";
+import { ReporterOptions, Report } from "simple-json-reporter";
 
 const hasReporterConfig = (config: PlaywrightTestConfig) => {
   return "reporter" in config;
@@ -95,40 +94,9 @@ const backupLatestReport = () => {
   }
 };
 
-const runLatestFailedTests = (options: string[]) => {
-  const reporterOptions = getSimpleJsonReporterOptions(testConfig);
-  const reportFilePath = path.join(
-    reporterOptions.outputFolder ?? "report",
-    reporterOptions.name ?? "report.json",
-  );
-  if (!fs.existsSync(reportFilePath))
-    throw new Error(`${reportFilePath} does not exist`);
-
-  const report: Report = JSON.parse(fs.readFileSync(reportFilePath).toString());
-  const targets: string[] = report.results
-    .filter((result: Result) => result.outcome === "unexpected")
-    .map((result: Result) => result.location);
-  if (targets.length) {
-    execSync(`npx playwright test ${options.join(" ")} ${targets.join(" ")}`, {
-      stdio: "inherit",
-    });
-  } else {
-    console.info(
-      "There is no test case resulted as unexpected in the latest report",
-    );
-  }
-};
-
 // 親コマンド
 const program = new Command();
 program.enablePositionalOptions();
-program
-  .command("test:latest-failed [options...]")
-  .description("Run the latest failed test cases")
-  .passThroughOptions()
-  .action((options) => {
-    runLatestFailedTests(options);
-  });
 program
   .command("report:backup")
   .description("Link the report of latest-run tests to the latest")
